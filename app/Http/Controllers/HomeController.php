@@ -519,7 +519,11 @@ class HomeController extends Controller
                 ->whereDate('end_date', '!=', "1970-06-01")
                 ->where(function($query) use ($start, $end) {
                     $query->whereBetween('start_date', [$start, $end])
-                          ->orWhereBetween('end_date', [$start, $end]);
+                          ->orWhereBetween('end_date', [$start, $end])
+                          ->orWhere(function($query) use ($start, $end) {
+                              $query->where('start_date', '<=', $start)
+                                    ->where('end_date', '>=', $end);
+                          });
                 });
         })
         ->with([
@@ -530,7 +534,11 @@ class HomeController extends Controller
                     ->whereDate('end_date', '!=', "1970-06-01")
                     ->where(function($query) use ($start, $end) {
                         $query->whereBetween('start_date', [$start, $end])
-                              ->orWhereBetween('end_date', [$start, $end]);
+                              ->orWhereBetween('end_date', [$start, $end])
+                              ->orWhere(function($query) use ($start, $end) {
+                                  $query->where('start_date', '<=', $start)
+                                        ->where('end_date', '>=', $end);
+                              });
                     });
             },
             'contract.job_lookup',
