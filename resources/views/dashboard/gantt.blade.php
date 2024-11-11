@@ -427,24 +427,38 @@
             @if (Auth::user()->role == 'admin')
                 gantt.init("contractor-properties-gantt");
             @endif
-
-            $.ajax({
+            function convert(str) {
+            var date = new Date(str),
+                mnth = ("0" + (date.getMonth() + 1)).slice(-2),
+                day = ("0" + date.getDate()).slice(-2);
+            return [date.getFullYear(), mnth, day].join("-");
+            }
+            function renData(start,end){
+                $.ajax({
                 url: "{{ route('dashboard.properties-jobs') }}",
                 type: "POST",
+                data:{
+                    'start':convert(start),
+                    'end':convert(end),
+                },
                 success: function(response) {
                     const data = response.data;
+                    
+                    console.log(data);
                     function parseAllData() {
                         data.forEach(task => {
                             $('#overlay2').css('display','block');
                             gantt.addTask(task);
                         });
                         $('#overlay2').css('display','none');
-                        filterDate(weekStart, monthEnd);
+                        // filterDate(weekStart, monthEnd);
                     }
                     parseAllData();
-                    filterDate(weekStart, monthEnd);
+                    filterDate(start, end);
                 }
             });
+            }
+            renData(weekStart,monthEnd);
 
             // task class
             gantt.templates.task_class = function(start, end, task) {
@@ -461,6 +475,20 @@
                     checkAndAddClass();
                     CountGantt();
                 });
+            }
+            function filterDate2(start, end) {
+                            gantt.config.start_date = new Date(start.format('YYYY-MM-DD'));
+                            gantt.config.end_date = new Date(end.format('YYYY-MM-DD'));
+                            // gantt.render()
+                            // gantt.attachEvent("onGanttRender", function() {
+                                checkAndAddClass();
+                                CountGantt();
+                                var endt = moment(end, 'YYYY-MM-DD').format('YYYY-MM-DD');
+                                var startt = moment(start, 'YYYY-MM-DD').format('YYYY-MM-DD');
+                                var url = '{{ url('/dashboard/contractor-properties-gantt') }}?start=' + startt +
+                                    '&end=' + endt;
+                                    window.location.href = url;
+                            // });
             }
 
 
@@ -495,7 +523,7 @@
                     'Next 3 Months': [moment(), moment().add(3, 'month').startOf('month')],
                     'Next 6 Months': [moment(), moment().add(6, 'month').startOf('month')]
                 }
-            }, filterDate);
+            }, filterDate2);
 
         });
 

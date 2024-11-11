@@ -508,8 +508,36 @@ class HomeController extends Controller
 
     public function propertiesJobs(Request $request)
     {
+        $start = $request->start ?? date('Y-m-01');
+        $end = $request->end ?? date('Y-m-t');
+        
         $events['data'] = [];
-        $property_contracts = Property::with('contract.job_lookup')->with('contract.contractor')->get();
+        $property_contracts = Property::whereHas('contract', function($query) use ($start, $end) {
+            $query->whereNotNull('start_date')
+                ->whereNotNull('end_date')
+                ->whereDate('start_date', '!=', "1970-06-01")
+                ->whereDate('end_date', '!=', "1970-06-01")
+                ->where(function($query) use ($start, $end) {
+                    $query->whereBetween('start_date', [$start, $end])
+                          ->orWhereBetween('end_date', [$start, $end]);
+                });
+        })
+        ->with([
+            'contract' => function($query) use ($start, $end) {
+                $query->whereNotNull('start_date')
+                    ->whereNotNull('end_date')
+                    ->whereDate('start_date', '!=', "1970-06-01")
+                    ->whereDate('end_date', '!=', "1970-06-01")
+                    ->where(function($query) use ($start, $end) {
+                        $query->whereBetween('start_date', [$start, $end])
+                              ->orWhereBetween('end_date', [$start, $end]);
+                    });
+            },
+            'contract.job_lookup',
+            'contract.contractor'
+        ])
+        ->get();
+
         $i = 0;
         foreach ($property_contracts as $property_contract) {
             $rand = rand(0000,9999);
@@ -530,40 +558,43 @@ class HomeController extends Controller
             ];
             array_push($events['data'], $event);
             $i++;
-            foreach ($property_contract->contract as $contract) {
-                $i++;
-                $to = \Carbon\Carbon::parse($contract->start_date);
-                $from = \Carbon\Carbon::parse($contract->end_date);
-                $days = $to->diffInDays($from);
-                $status_color = [
-                    'Pending' => 'badge-warning',
-                    'Accepted' => 'badge-success-light',
-                    'Rejected' => 'badge-danger',
-                    'Complete' => 'badge-success',
-                    'Variation' => 'badge-info',
-                    'In-Progress' => 'badge-warning-light'
-                ];
 
-                if($contract->id == $property_contract->id) {
-                    $cids = $contract->id."@@@";
-                }else {
-                    $cids = $contract->id;
+            if(sizeOf($property_contract->contract)){
+                foreach ($property_contract->contract as $contract) {
+                    $i++;
+                    $to = \Carbon\Carbon::parse($contract->start_date);
+                    $from = \Carbon\Carbon::parse($contract->end_date);
+                    $days = $to->diffInDays($from);
+                    $status_color = [
+                        'Pending' => 'badge-warning',
+                        'Accepted' => 'badge-success-light',
+                        'Rejected' => 'badge-danger',
+                        'Complete' => 'badge-success',
+                        'Variation' => 'badge-info',
+                        'Unassigned' => 'badge-info',
+                        'In-Progress' => 'badge-warning-light'
+                    ];
+
+                    if($contract->id == $property_contract->id) {
+                        $cids = $contract->id."@@@";
+                    }else {
+                        $cids = $contract->id;
+                    }
+                    $event = [
+                        'id' => $cids ?? '',
+                        'text' => $contract->job_lookup->title ?? '',
+                        'start_date' =>  $contract->start_date ?? '',
+                        'duration' => $days,
+                        'parent' => $modifiedID,
+                        'status' => '<span class="pointer badge ' . $status_color[$contract->status] . ' text-uppercase">' . $contract->status . '</span>',
+                        'contractor' => $contract->contractor->firstname ?? '',
+                        'address' => $address,
+                        'url' => url('/dashboard/property/show/' . $url)
+                    ];
+                    array_push($events['data'], $event);
                 }
-                $event = [
-                    'id' => $cids ?? '',
-                    'text' => $contract->job_lookup->title ?? '',
-                    'start_date' =>  $contract->start_date ?? '',
-                    'duration' => $days,
-                    'parent' => $modifiedID,
-                    'status' => '<span class="pointer badge ' . $status_color[$contract->status] . ' text-uppercase">' . $contract->status . '</span>',
-                    'contractor' => $contract->contractor->firstname ?? '',
-                    'address' => $address,
-                    'url' => url('/dashboard/property/show/' . $url)
-                ];
-                array_push($events['data'], $event);
             }
         }
-        // dd($events);
         return response()->json($events);
     }
 

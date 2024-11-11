@@ -282,8 +282,20 @@
         });
 
             CountGantt();
+            var s = "{{ $start ?? '' }}";
+            var e = "{{ $end ?? '' }}";
+
+            // Set default week start and month end dates
             var weekStart = moment().subtract(7, 'days');
             var monthEnd = moment().endOf('month');
+
+            if (s !== "" && e !== "") {
+                weekStart = moment(s, "YYYY-MM-DD");
+                monthEnd = moment(e, "YYYY-MM-DD");
+            }
+
+            console.log("Week Start:", weekStart.format('YYYY-MM-DD'));
+            console.log("Month End:", monthEnd.format('YYYY-MM-DD'));
             gantt.plugins({
                 tooltip: true
             });
@@ -402,41 +414,69 @@
                 gantt.init("contractor-properties-gantt");
             @endif
 
-            $.ajax({
+            
+            function convert(str) {
+            var date = new Date(str),
+                mnth = ("0" + (date.getMonth() + 1)).slice(-2),
+                day = ("0" + date.getDate()).slice(-2);
+            return [date.getFullYear(), mnth, day].join("-");
+            }
+            function renData(start,end){
+                $.ajax({
                 url: "{{ route('dashboard.properties-jobs') }}",
                 type: "POST",
+                data:{
+                    'start':convert(start),
+                    'end':convert(end),
+                },
                 success: function(response) {
                     const data = response.data;
+                    
+                    console.log(data);
                     function parseAllData() {
                         data.forEach(task => {
                             $('#overlay2').css('display','block');
                             gantt.addTask(task);
                         });
                         $('#overlay2').css('display','none');
-                        filterDate(weekStart, monthEnd);
+                        // filterDate(weekStart, monthEnd);
                     }
                     parseAllData();
-                    filterDate(weekStart, monthEnd);
+                    filterDate(start, end);
                 }
             });
-
-
+            }
+            renData(weekStart,monthEnd);
             //filter
             function filterDate(start, end) {
                 gantt.config.start_date = new Date(start.format('YYYY-MM-DD'));
                 gantt.config.end_date = new Date(end.format('YYYY-MM-DD'));
-                gantt.render()
-                gantt.attachEvent("onGanttRender", function() {
+                // gantt.render()
+                // gantt.attachEvent("onGanttRender", function() {
                     checkAndAddClass();
                     CountGantt();
                     var endt = moment(end, 'YYYY-MM-DD').format('YYYY-MM-DD');
                     var startt = moment(start, 'YYYY-MM-DD').format('YYYY-MM-DD');
                     var url = '{{ url('/dashboard/contractor-properties-gantt') }}?start=' + startt +
                         '&end=' + endt;
+                        // window.location.href = url;
                     $('.view_in_full').attr('href', url);
-                });
+                // });
             }
-
+            function filterDate2(start, end) {
+                            gantt.config.start_date = new Date(start.format('YYYY-MM-DD'));
+                            gantt.config.end_date = new Date(end.format('YYYY-MM-DD'));
+                            // gantt.render()
+                            // gantt.attachEvent("onGanttRender", function() {
+                                checkAndAddClass();
+                                CountGantt();
+                                var endt = moment(end, 'YYYY-MM-DD').format('YYYY-MM-DD');
+                                var startt = moment(start, 'YYYY-MM-DD').format('YYYY-MM-DD');
+                                var url = '{{ url('/dashboard/scheduler') }}?start=' + startt +
+                                    '&end=' + endt;
+                                    window.location.href = url;
+                            // });
+            }
 
             $('#gantt-date-filter').daterangepicker({
                 alwaysShowCalendars: true,
@@ -454,7 +494,7 @@
                     'Next 3 Months': [moment(), moment().add(3, 'month').startOf('month')],
                     'Next 6 Months': [moment(), moment().add(6, 'month').startOf('month')]
                 }
-            }, filterDate);
+            }, filterDate2);
 
             function checkAndAddClass() {
                 var today = new Date();
