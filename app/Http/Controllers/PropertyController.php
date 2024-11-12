@@ -516,7 +516,10 @@ class PropertyController extends Controller
     {
         $id = Crypt::decrypt($id);
 
+        //
         $getPropertyDetails = Property::where('id', $id)->first();
+        $getInsp = DB::table('inspections')->where('fk_property_id',$id)->get();
+
         $address = format_address(
             $getPropertyDetails->house_num,
             $getPropertyDetails->address1,
@@ -525,7 +528,15 @@ class PropertyController extends Controller
             $getPropertyDetails->county,
             $getPropertyDetails->eircode
         );
-
+        foreach($getInsp as $insp){
+            $tReq = new Request();
+            $tReq->merge([
+                'inspection_id' => $insp->id,
+                'type' => $insp->fk_forms_id,
+            ]);
+            $this->reportDeletes($tReq);
+        }
+            $this->deletewithProperty($id);
         $deleted = Property::where('id', $id)->delete();
 
         if($deleted) {
@@ -535,8 +546,11 @@ class PropertyController extends Controller
                 "route" => "property"
             ];
             newNotification($details);
+            return redirect()->back()->with('success','property deleted successfully.');
+        }else{
+            return redirect()->back()->with('error','property not deleted.');
+
         }
-        return redirect()->back();
     }
     public function updateMeaStatus(Request $request)
     {
@@ -576,10 +590,10 @@ class PropertyController extends Controller
                     $request->validate([
                         'client_id' => ['required', 'numeric'],
                     ]);
-    
+
                     $client_id = $request->client_id;
                 } else if ($request->client_select_type == 'use_above_client') {
-    
+
                     $created_client = Client::where('id', $checkCl->id)->update([
                         'email' => '',
                         'name' => $request->wh_fname . ' ' . $request->wh_lname,
@@ -591,7 +605,7 @@ class PropertyController extends Controller
                         'county' => $request->county,
                         'notes' => $request->notes,
                     ]);
-    
+
                     $client_id = $checkCl->id;
                 } else if ($request->client_select_type == 'create_new_client') {
                     $created_client = Client::where('id', $checkCl->id)->update([
@@ -1877,6 +1891,18 @@ class PropertyController extends Controller
                 return redirect()->back()->with('error', "Failed to delete Inspection & Report.");
             }
 
+        } else if ($type == 15) { // terreco Survey
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('terraco_forms')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+                return redirect()->back()->with('success', "Inspection & Report Deleted Successfully.");
+            } catch (\Exception $e) {
+                DB::rollback();
+                return redirect()->back()->with('error', "Failed to delete Inspection & Report.");
+            }
         } else if ($type == 55) {
             DB::beginTransaction();
             try {
@@ -1905,7 +1931,7 @@ class PropertyController extends Controller
             DB::beginTransaction();
             try {
                 // Delete records from related tables
-                DB::table('pre_risk_safety_form')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('prem_risk_safety_form')->where('fk_inspection_id', $inspection_id)->delete();
                 DB::table('inspections')->where('id', $inspection_id)->delete();
                 DB::commit();
                 return redirect()->back()->with('success', "Inspection & Report Deleted Successfully.");
@@ -2608,9 +2634,9 @@ class PropertyController extends Controller
         )
         ->first();
 
-        if ($is_measure_alreadt_exist) {
-            return redirect()->back();
-        }
+        // if ($is_measure_alreadt_exist) {
+        //     return redirect()->back();
+        // }
 
         $default_contractor = User::where('role', 'contractor')
             ->where('is_default_contractor', 1)
@@ -3538,6 +3564,284 @@ class PropertyController extends Controller
     {
         Appointment::where('id', $id)->delete();
         return redirect()->back();
+    }
+    private function reportDeletes(Request $request)
+    {
+        // dd($request, $inspection_id, $type, $mode);
+        $inspection_id = $type = null;
+        $inspection_id = $request->inspection_id;
+        $type = $request->type;
+        // dd($request->all(),$inspection_id,$type);
+        $template = '';
+        $data = [];
+        if ($type == 13) { //Progress Report
+            $progR = DB::table('progress_report')->where('fk_inspection_id', $inspection_id)->delete();
+            $deleteInsp = DB::table('inspections')->where('id', $inspection_id)->delete();
+
+        } else if ($type == 12) { //Pre Works Inspection
+            DB::beginTransaction();
+            try {
+                DB::table('pi_building_details')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_wall_insulation')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_external_installation')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_external_installation2')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_attic_insulation')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_heating_upgrade')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_grand_total')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_grants_credits')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_additional_photos_notes')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_drawings_and_photographs')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_additional_property_detail')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('pi_iternal_insulation')->where('fk_inspection_id', $inspection_id)->delete();
+
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 22) { //OSS Quotation
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('oss_template')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('oss_cost')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 24) { //Fuel Quotation
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('fuel_template')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('fuel_cost')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 23) { //Hosuing Quotation
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('housing_template')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('housing_cost')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 25) { //Better Energy Homes QA
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('bre_photo_inspection_items')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 21) { // Installer Progress Report
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('photo_inspection_items')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 7) { // CWI Survey
+            DB::beginTransaction();
+            try {
+                DB::table('ws_additional_property_detail')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_building_details')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_building_type')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_condition_of_inner_leaf')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_condition_of_outer_leaf')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_insulation_present_in_cavity')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_new_build_cavity')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_services_in_the_cavity')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('ws_ventilation_through_the_cavity')->where('fk_inspection_id', $inspection_id)->delete();
+
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 14) { // EWI Installer Progress Report
+            DB::beginTransaction();
+            try {
+                DB::table('sir_base_coat_complete')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('sir_boarding_complete')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('sir_drawings_photographs')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('sir_finish_coat_complete')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('sir_job_complete')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('sir_preparation_complete')->where('fk_inspection_id', $inspection_id)->delete();
+
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+
+        } else if ($type == 26) { // Contractors QA
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('cqa_photo_inspection_items')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 6) { // Roof Survey
+            DB::beginTransaction();
+            try {
+                DB::table('rs_additional_property_detail')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_building_details')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_coomments_photographs')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_roof_conditions')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_roof_services')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_roof_types')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_roof_ventilation')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('rs_spray_plan_for_roof')->where('fk_inspection_id', $inspection_id)->delete();
+
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+
+        } else if ($type == 55) {
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('risk_safety_form')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 56 || $type == 58 || $type == 59 || $type == 60) {
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('rams_core_ventilation')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 57) {
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('prem_risk_safety_form')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 11) {
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('contract_forms')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 15) { // terreco Survey
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('terraco_forms')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+        } else if ($type == 61) {
+            DB::beginTransaction();
+            try {
+                // Delete records from related tables
+                DB::table('toolbox_talk_save')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('toolbox_talk_person')->where('fk_inspection_id', $inspection_id)->delete();
+                DB::table('inspections')->where('id', $inspection_id)->delete();
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollback();
+
+            }
+
+        } else {
+
+            abort(404);
+        }
+        return true;
+    }
+    private function deletewithProperty($id)
+    {
+        try{
+        DB::table('reminders')->where('property_id',$id)->delete();
+        DB::table('appointment_data')->where('property_id',$id)->delete();
+        DB::table('contractor_message')->where('property_id',$id)->delete();
+        DB::table('contractor_property')->where('property_id',$id)->delete();
+        DB::table('contractor_property_notes')->where('property_id',$id)->delete();
+        DB::table('lead_emails')->where('fk_property_id',$id)->delete();
+        DB::table('notifications_mobile')->where('property_id',$id)->delete();
+        DB::table('photo_uploads')->where('fk_property_id',$id)->delete();
+        DB::table('properties_order')->where('property_id',$id)->delete();
+        DB::table('property_notes')->where('property_id',$id)->delete();
+        DB::table('property_surveyors')->where('property_id',$id)->delete();
+        DB::table('user_prop_signin_out')->where('property_id',$id)->delete();
+        $getSnag = DB::table('snag_records')->where('fk_property_id',$id)->first();
+        if($getSnag){
+            $getSangC = DB::table('snag_records_comments')->where('fk_snag_record_id',$getSnag->id)->first();
+            if($getSangC){
+                DB::table('snag_records_reply_comment')->where('fk_snag_comment_id',$getSangC->id)->delete();
+                DB::table('snag_records_comments')->where('fk_snag_record_id',$getSnag->id)->delete();
+            }
+            DB::table('snag_records')->where('fk_property_id',$id)->delete();
+        }
+        return true;
+        }catch (\Exception $e){
+            return false;
+        }
     }
 }
 
