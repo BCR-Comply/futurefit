@@ -724,12 +724,12 @@
                 <label class="mb-1" for="status">Batch Status</label>
 
                 <select name="status" id="batch_status" class="form-control"
-                    onchange="if(confirm('Are you sure you want to change status?')) { this.form.submit(); } else { this.value = '{{ $property->batch->status }}'; }">
-                    <option {{ isset($property) ? ($property->batch->status == 'pending' ? 'selected' : '') : '' }}
+                    onchange="if(confirm('Are you sure you want to change status?')) { this.form.submit(); } else { this.value = '{{ isset($property->batch) ? $property->batch->status : '' }}'; }">
+                    <option {{ isset($property) ? (isset($property->batch) ? $property->batch->status == 'pending' ? 'selected' : '' : '') : '' }}
                         value="pending">
                         Pending
                     </option>
-                    <option {{ isset($property) ? ($property->batch->status == 'completed' ? 'selected' : '') : '' }}
+                    <option {{ isset($property) ? (isset($property->batch) ? $property->batch->status == 'completed' ? 'selected' : '' : '') : '' }}
                         value="completed">
                         Completed
                     </option>
