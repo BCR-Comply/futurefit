@@ -44,7 +44,7 @@ return [
 
         'public' => [
             'driver' => 'local',
-            'root'   => public_path() . '/files',
+            'root'   => '/mnt/data/home/500964.cloudwaysapps.com/ypjvsrdfbx/public_html/public/files',
             'url' => env('APP_URL') . '/public',
             'visibility' => 'public',
         ],
